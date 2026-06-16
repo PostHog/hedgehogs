@@ -34,6 +34,8 @@ jobs:
     needs: check-activity
     if: needs.check-activity.outputs.run == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      report: ${{ steps.report.outputs.report }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -42,7 +44,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Post SVG-vs-PNG migration status to Slack
-        run: pnpm migration-report
-        env:
-          SLACK_HEDGEHOGS_WEBHOOK_URL: ${{ secrets.SLACK_HEDGEHOGS_WEBHOOK_URL }}
+      - name: Build SVG-vs-PNG migration status
+        id: report
+        run: |
+          report="$(pnpm -s migration-report)"
+          echo "$report" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "report<<REPORT_EOF"
+            echo "$report"
+            echo "REPORT_EOF"
+          } >> "$GITHUB_OUTPUT"

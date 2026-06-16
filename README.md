@@ -94,7 +94,7 @@ approval, per the
 
 Every asset ships as an optimized SVG when it's a true vector under budget, otherwise as a
 768px PNG rendered from the same source. We're migrating everything toward true SVGs, and a
-weekly Slack report tracks progress.
+weekly workflow reports progress.
 
 ## License
 

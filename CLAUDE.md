@@ -32,5 +32,6 @@ No PRs — everything is committed directly to `main` (verified API commits via 
 Releaser GitHub App). Daily `sync.yml` commits new art + a changeset to `main`; that
 triggers `release.yml`, which (gated by the `Release` environment + Slack approval, per
 the PostHog SDK handbook) runs `changeset version`, commits the bump to `main`, and
-publishes to npm via trusted publishing (OIDC). `migration-report.yml` posts an
-SVG-vs-PNG status to Slack every Monday, only if there were commits that week.
+publishes to npm via trusted publishing (OIDC). `migration-report.yml` produces an
+SVG-vs-PNG status report (job output + step summary) every Monday, only if there were
+commits that week.
