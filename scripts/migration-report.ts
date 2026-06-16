@@ -1,4 +1,4 @@
-// Posts a Slack TLDR on the SVG-vs-PNG migration after a release publishes.
+// Posts a weekly Slack TLDR on the SVG-vs-PNG migration.
 // Goal: every hedgehog ships as a true SVG. Until then, this nudges progress.
 //
 // Run as `pnpm migration-report`. Reads SLACK_HEDGEHOGS_WEBHOOK_URL from the env;
@@ -23,7 +23,7 @@ const pending = stats.largestPending
   .join("\n");
 
 const summary =
-  `*🦔 @posthog/hedgehogs ${version} published*\n\n` +
+  `*🦔 Hedgehog SVG migration — weekly status (v${version})*\n\n` +
   `*${stats.svg}* of *${stats.total}* hedgehogs ship as true SVGs ` +
   `(*${stats.svgPct}%*) — the rest fall back to bundled PNGs.\n` +
   `\`${progressBar(stats.svgPct)}\` ${stats.svgPct}%\n\n` +
@@ -40,7 +40,7 @@ if (!webhook) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text: `@posthog/hedgehogs ${version}: ${stats.svgPct}% migrated to SVG`,
+      text: `Hedgehog migration: ${stats.svgPct}% shipping as SVG (v${version})`,
       blocks: [{ type: "section", text: { type: "mrkdwn", text: summary } }],
     }),
   });
