@@ -1,0 +1,63 @@
+name: Sync art
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # A dedicated GitHub App (per the PostHog SDK release handbook) so the PR
+      # is authored by an identity that can trigger CI and is exempt from rulesets.
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASER_APP_ID }}
+          private-key: ${{ secrets.RELEASER_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Sync catalog from the art pipeline
+        run: pnpm sync
+
+      - name: Validate the synced catalog builds and passes tests
+        run: |
+          pnpm codegen
+          pnpm test
+          pnpm build
+
+      - name: Write changeset describing the changes
+        run: node scripts/write-sync-changeset.ts
+
+      - name: Open or update the sync PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: chore/art-sync
+          title: "chore: sync hedgehog catalog"
+          commit-message: "chore: sync hedgehog catalog"
+          labels: art-sync
+          body: |
+            Automated sync of the hedgehog catalog from the art pipeline.
+
+            Review the asset changes under `assets/`, then add the `release`
+            label when you're ready to publish. See the changeset for the
+            added/removed/re-delivered summary.
+          add-paths: |
+            assets/**
+            .changeset/**

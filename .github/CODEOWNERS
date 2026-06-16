@@ -1,0 +1,3 @@
+* @PostHog/team-brand
+/.github/ @PostHog/client-libraries-approvers
+/scripts/ @PostHog/client-libraries-approvers

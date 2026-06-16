@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # The Release environment gates publishing behind required reviewers
+    # (@PostHog/client-libraries-approvers), per the SDK release handbook.
+    environment: Release
+    permissions:
+      contents: write # push tags / version commit
+      pull-requests: write # open the "Version Packages" PR
+      id-token: write # npm trusted publishing (OIDC)
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASER_APP_ID }}
+          private-key: ${{ secrets.RELEASER_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # When changesets exist on main, this opens/updates a "Version Packages" PR.
+      # When that PR is merged (no changesets remain), it runs `pnpm release`
+      # (= `changeset publish`) to publish via npm trusted publishing.
+      - name: Version or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          publish: pnpm release
+          commit: "chore: release"
+          title: "chore: release"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NPM_CONFIG_PROVENANCE: "true"
+
+  migration-report:
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Post SVG-vs-PNG migration TLDR to Slack
+        run: pnpm migration-report
+        env:
+          SLACK_HEDGEHOGS_WEBHOOK_URL: ${{ secrets.SLACK_HEDGEHOGS_WEBHOOK_URL }}
