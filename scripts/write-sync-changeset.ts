@@ -9,20 +9,37 @@ import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { Catalog } from "./lib/catalog.ts"
-import { NAMESPACES } from "../src/types.ts"
+import { NAMESPACES, type Namespace } from "../src/types.ts"
+import { applyRename } from "./lib/renames.ts"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
+// Baseline to diff the working catalogs against. Defaults to HEAD (the normal sync case);
+// override to backfill — e.g. CHANGESET_BASE_REF=HEAD~1 to describe assets that were
+// committed without a changeset, so every entry shows up as "added".
+const BASE_REF = process.env.CHANGESET_BASE_REF ?? "HEAD"
+
 function committed<T>(relPath: string): T | null {
   try {
-    const raw = execSync(`git show HEAD:${relPath}`, { cwd: ROOT, encoding: "utf8" })
+    const raw = execSync(`git show ${BASE_REF}:${relPath}`, { cwd: ROOT, encoding: "utf8" })
     return JSON.parse(raw) as T
   } catch {
-    return null // first sync, or file didn't exist at HEAD
+    return null // first sync, or file didn't exist at the baseline
   }
 }
 
-const body: string[] = ["Sync brand assets from Figma.", ""]
+// Human-readable display name for a catalog entry, e.g. "Doctor Hog", "Array Mini" —
+// reads far better in the changelog than the raw Figma slug ("doctor-hog", "dadd-ai-l").
+// Apply renames so the changelog reflects the published name ("Dadd AI Left"), not the
+// raw Figma label the catalog mirror keeps; minis keep their tier suffix.
+const label = (e: { namespace: Namespace; slug: string; name: string; tier?: string }) => {
+  const renamed = applyRename(e.namespace, e.slug, e.name).name
+  return e.tier === "mini" && !renamed.endsWith(" Mini") ? `${renamed} Mini` : renamed
+}
+
+const sections: string[] = []
+let totalAdded = 0
+let totalRemoved = 0
 
 for (const ns of NAMESPACES) {
   const rel = `assets/${ns}/catalog.json`
@@ -36,28 +53,53 @@ for (const ns of NAMESPACES) {
   const prev = new Map((previous?.entries ?? []).map((e) => [key(e), e]))
   const curr = new Map(current.entries.map((e) => [key(e), e]))
 
-  const added = [...curr.keys()].filter((s) => !prev.has(s)).sort()
-  const removed = [...prev.keys()].filter((s) => !curr.has(s)).sort()
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
+  const added = [...curr.keys()]
+    .filter((s) => !prev.has(s))
+    .map((s) => curr.get(s)!)
+    .sort(byName)
+  const removed = [...prev.keys()]
+    .filter((s) => !curr.has(s))
+    .map((s) => prev.get(s)!)
+    .sort(byName)
   const updated = [...curr.entries()]
     .filter(([s, e]) => prev.get(s) && JSON.stringify(prev.get(s)) !== JSON.stringify(e))
-    .map(([s]) => s)
-    .sort()
+    .map(([, e]) => e)
+    .sort(byName)
 
   if (added.length || removed.length || updated.length) {
-    body.push(`**${ns}**`)
-    if (added.length) body.push(`- Added ${added.length}: ${added.join(", ")}`)
-    if (removed.length) body.push(`- Removed ${removed.length}: ${removed.join(", ")}`)
-    if (updated.length) body.push(`- Updated ${updated.length}: ${updated.join(", ")}`)
-    body.push("")
+    totalAdded += added.length
+    totalRemoved += removed.length
+
+    const lines = [`**${ns}**`]
+    if (added.length) lines.push(`- Added ${added.length}: ${added.map(label).join(", ")}`)
+    if (removed.length) lines.push(`- Removed ${removed.length}: ${removed.map(label).join(", ")}`)
+    if (updated.length) lines.push(`- Updated ${updated.length}: ${updated.map(label).join(", ")}`)
+
+    sections.push(lines.join("\n"))
   }
 }
 
-if (body.length <= 2) {
+if (sections.length === 0) {
   console.log("No catalog changes — skipping changeset.")
   process.exit(0)
 }
 
+// Accurate one-line summary (becomes the changelog headline), then the per-namespace detail.
+const counts = [
+  totalAdded ? `${totalAdded} added` : "",
+  totalRemoved ? `${totalRemoved} removed` : "",
+].filter(Boolean) as string[]
+
+const headline = counts.length
+  ? `Sync brand assets from Figma (${counts.join(", ")}).`
+  : "Sync brand assets from Figma."
+const body = [headline, ...sections].join("\n\n")
+
 const slug = process.env.GITHUB_RUN_ID ?? "local"
 const file = join(ROOT, ".changeset", `brand-sync-${slug}.md`)
-await writeFile(file, `---\n"@posthog/brand": minor\n---\n\n${body.join("\n").trim()}\n`)
-console.log(`Wrote ${file}:\n${body.join("\n")}`)
+
+// Always a minor bump: a sync only ever adds, re-renders, or drops illustration assets
+// behind the fully-namespaced API — never a breaking change to existing exports.
+await writeFile(file, `---\n"@posthog/brand": minor\n---\n\n${body}\n`)
+console.log(`Wrote ${file}:\n${body}`)
