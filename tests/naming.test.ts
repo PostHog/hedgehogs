@@ -30,8 +30,20 @@ describe("slug -> identifier", () => {
     ["996-coder-hog", "996CoderHog"],
     ["404", "404"],
     ["array-mini", "ArrayMini"],
+    // "ai" is a known acronym: whole segments upper-case, substrings don't.
+    ["ai-gateway", "AIGateway"],
+    ["ai-research", "AIResearch"],
+    ["posthog-ai", "PosthogAI"],
+    ["dadd-ai-left", "DaddAILeft"],
+    ["waiter-server", "WaiterServer"],
   ])("slugToPascal(%s) === %s", (slug, expected) => {
     expect(slugToPascal(slug)).toBe(expected)
+  })
+
+  it("upper-cases acronym segments in component + const names", () => {
+    expect(componentName("crests", "ai-gateway", "full")).toBe("AIGatewayCrest")
+    expect(componentName("crests", "ai-gateway", "mini")).toBe("AIGatewayCrestMini")
+    expect(componentName("hoggies", "dadd-ai-left")).toBe("HedgehogDaddAILeft")
   })
 
   it("prefixes component names per namespace", () => {

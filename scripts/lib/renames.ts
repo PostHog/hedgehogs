@@ -30,6 +30,7 @@ export const RENAMES: Partial<Record<Namespace, Record<string, RenameRule>>> = {
   hoggies: {
     "dadd-ai-l": { slug: "dadd-ai-left", name: "Dadd AI Left" },
     "dadd-ai-r": { slug: "dadd-ai-right", name: "Dadd AI Right" },
+    "9-9-6": { slug: "996", name: "996" },
   },
 }
 

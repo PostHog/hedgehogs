@@ -31,12 +31,26 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, "")
 }
 
-/** "doctor-hog" -> "DoctorHog", "9-9-6" -> "996". */
+/**
+ * Slug segments rendered fully upper-cased in identifiers instead of Title-cased, so
+ * acronyms read correctly: "ai-gateway" -> "AIGateway", not "AiGateway". Matched
+ * case-insensitively against whole hyphen-delimited segments only (so "waiter" is
+ * untouched). Because `slugToPascal` is shared by codegen and the runtime
+ * `getComponentName`, adding a word here keeps the generated export and the runtime
+ * lookup in agreement — this is the one place that controls identifier casing.
+ */
+export const ACRONYMS: ReadonlySet<string> = new Set(["ai"])
+
+/** "doctor-hog" -> "DoctorHog", "9-9-6" -> "996", "ai-gateway" -> "AIGateway". */
 export function slugToPascal(slug: string): string {
   return slug
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) =>
+      ACRONYMS.has(part.toLowerCase())
+        ? part.toUpperCase()
+        : part.charAt(0).toUpperCase() + part.slice(1),
+    )
     .join("")
 }
 
