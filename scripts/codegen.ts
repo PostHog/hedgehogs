@@ -144,6 +144,60 @@ async function main(): Promise<void> {
 }
 
 /**
+ * TSDoc for a combined-barrel crest (`@posthog/brand/crests`). `kind` reflects which tiers
+ * exist: `both` documents the compound base + `.Mini`, `full`/`mini` document a single tier.
+ */
+function crestCombinedDoc(name: string, display: string, kind: "both" | "full" | "mini"): string {
+  const lines = ["/**"]
+  if (kind === "both") {
+    lines.push(
+      ` * The **${display}** crest. Use the base for the full illustration, and \`.Mini\` for the`,
+      " * simplified badge that reads at small sizes (favicons, avatars, inline chips).",
+      " *",
+      " * Pass `size`, `title`, and any other `<svg>` prop to either.",
+      " *",
+      " * @example",
+      " * ```tsx",
+      ` * import { ${name} } from "@posthog/brand/crests"`,
+      " *",
+      ` * <${name} size={64} title=${JSON.stringify(`${display} crest`)} /> // full illustration`,
+      ` * <${name}.Mini size={24} />${" ".repeat(Math.max(1, 24 - name.length))}// the mini badge`,
+      " * ```",
+    )
+  } else if (kind === "full") {
+    lines.push(
+      ` * The **${display}** crest. This crest only comes as the full illustration — it has no`,
+      " * `.Mini` badge.",
+      " *",
+      " * Pass `size`, `title`, and any other `<svg>` prop.",
+      " *",
+      " * @example",
+      " * ```tsx",
+      ` * import { ${name} } from "@posthog/brand/crests"`,
+      " *",
+      ` * <${name} size={64} title=${JSON.stringify(`${display} crest`)} />`,
+      " * ```",
+    )
+  } else {
+    lines.push(
+      ` * The **${display}** crest. This crest only comes as the mini badge, so the base and`,
+      " * `.Mini` are the same illustration.",
+      " *",
+      " * Pass `size`, `title`, and any other `<svg>` prop.",
+      " *",
+      " * @example",
+      " * ```tsx",
+      ` * import { ${name} } from "@posthog/brand/crests"`,
+      " *",
+      ` * <${name} size={24} title=${JSON.stringify(`${display} crest`)} />`,
+      " * ```",
+    )
+  }
+  lines.push(" */")
+  return lines.join("\n")
+}
+
+/**
  * Emit the combined `@posthog/brand/crests` barrel: one `<Name>Crest` per crest slug that
  * renders the full illustration, with the mini badge attached as `<Name>Crest.Mini` (a
  * compound component). Full-only slugs have no `.Mini`; a mini-only slug uses the mini as
@@ -178,6 +232,8 @@ async function writeCombinedCrests(): Promise<void> {
     }
     byName.set(name, slug)
 
+    const display = (full.get(slug) ?? mini.get(slug))!.name
+
     let content: string
     if (hasFull && hasMini) {
       // Re-export the full as the base with the mini attached as `.Mini` (compound
@@ -186,17 +242,23 @@ async function writeCombinedCrests(): Promise<void> {
         `${HEADER}${TYPE_IMPORT}` +
         `import { ${name} as Full } from "./full/components/${slug}.tsx";\n` +
         `import { ${miniName} } from "./mini/components/${slug}.tsx";\n\n` +
+        crestCombinedDoc(name, display, "both") +
+        "\n" +
         `export const ${name}: SvgAssetComponent & { Mini: SvgAssetComponent } = Object.assign(\n` +
         `  Full,\n  { Mini: ${miniName} },\n);\n\n` +
         `export default ${name};\n`
     } else if (hasFull) {
       // Full-only: a plain re-export — no `.Mini`, same binding as `crests/full`.
-      content = `${HEADER}export { ${name}, ${name} as default } from "./full/components/${slug}.tsx";\n`
+      content =
+        `${HEADER}${crestCombinedDoc(name, display, "full")}\n` +
+        `export { ${name}, ${name} as default } from "./full/components/${slug}.tsx";\n`
     } else {
       // Mini-only: the mini is the base, and is also exposed as `.Mini`.
       content =
         `${HEADER}${TYPE_IMPORT}` +
         `import { ${miniName} } from "./mini/components/${slug}.tsx";\n\n` +
+        crestCombinedDoc(name, display, "mini") +
+        "\n" +
         `export const ${name}: SvgAssetComponent & { Mini: SvgAssetComponent } = Object.assign(\n` +
         `  ${miniName},\n  { Mini: ${miniName} },\n);\n\n` +
         `export default ${name};\n`
@@ -259,6 +321,43 @@ async function writePng(group: AssetGroup, entry: GeneratedEntry): Promise<void>
   )
 }
 
+/** Example `size` (px) used in a generated component's `@example`, scaled per group. */
+function exampleSize(group: AssetGroup): number {
+  if (group.namespace === "hoggies") return 120
+  return group.tier === "mini" ? 24 : 64
+}
+
+/** One-line identity for a single-asset component's TSDoc, e.g. "The **Doctor Hog** …". */
+function assetLead(group: AssetGroup, entry: GeneratedEntry): string {
+  if (group.namespace === "hoggies") return `The **${entry.name}** hedgehog illustration`
+  if (group.tier === "mini") return `The **${entry.name}** crest — the simplified mini badge`
+  return `The **${entry.name}** crest — the full illustration`
+}
+
+/**
+ * The TSDoc block emitted above each generated component: a one-line identity, the shared
+ * `size`/`title` usage note, and a copy-pasteable `@example` keyed to the asset's real name
+ * and import subpath. Every component gets one, so editor IntelliSense describes each asset
+ * (and its usage) on hover.
+ */
+function componentDoc(group: AssetGroup, entry: GeneratedEntry, name: string): string {
+  return [
+    "/**",
+    ` * ${assetLead(group, entry)}, as a React component.`,
+    " *",
+    " * Pass `size` to set the width (height follows automatically), and `title` to give it an",
+    " * accessible label. Accepts any other `<svg>` prop (`className`, `style`, `onClick`, …).",
+    " *",
+    " * @example",
+    " * ```tsx",
+    ` * import { ${name} } from "@posthog/brand/${group.path}"`,
+    " *",
+    ` * <${name} size={${exampleSize(group)}} title=${JSON.stringify(entry.name)} />`,
+    " * ```",
+    " */",
+  ].join("\n")
+}
+
 async function writeComponent(group: AssetGroup, entry: GeneratedEntry): Promise<void> {
   const name = componentName(group.namespace, entry.slug, group.tier)
   await writeOut(
@@ -266,6 +365,7 @@ async function writeComponent(group: AssetGroup, entry: GeneratedEntry): Promise
     `${HEADER}import { createSvgAsset, type SvgAssetComponent } from "${kindToSrc(group)}runtime/create-svg-asset.tsx";\n` +
       `import { body, viewBox } from "../svg/${entry.slug}.ts";\n` +
       `import { meta } from "../meta/${entry.slug}.ts";\n\n` +
+      `${componentDoc(group, entry, name)}\n` +
       `export const ${name}: SvgAssetComponent = createSvgAsset({ viewBox, body, meta });\n\n` +
       `export default ${name};\n`,
   )
