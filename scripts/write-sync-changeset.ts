@@ -1,65 +1,105 @@
-// Writes a changeset describing what the latest sync changed, by diffing the
-// working catalog against the committed one. No-op (and no file) when nothing
-// changed. Used by the sync workflow before it commits to main.
+// Writes a changeset describing what the latest sync changed, by diffing the working
+// catalogs against the committed ones (per namespace). No-op (and no file) when nothing
+// changed. Used by the sync workflow before it commits to main. (Colors are a fixed,
+// hand-maintained palette in static/colors.ts — not synced, so not diffed here.)
 
-import { execSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import type { Catalog } from "./lib/catalog.ts";
+import { execSync } from "node:child_process"
+import { readFile, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import type { Catalog } from "./lib/catalog.ts"
+import { NAMESPACES, type Namespace } from "../src/types.ts"
+import { applyRename } from "./lib/renames.ts"
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CATALOG = join(ROOT, "assets", "catalog.json");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
-function committedCatalog(): Catalog | null {
+// Baseline to diff the working catalogs against. Defaults to HEAD (the normal sync case);
+// override to backfill — e.g. CHANGESET_BASE_REF=HEAD~1 to describe assets that were
+// committed without a changeset, so every entry shows up as "added".
+const BASE_REF = process.env.CHANGESET_BASE_REF ?? "HEAD"
+
+function committed<T>(relPath: string): T | null {
   try {
-    const raw = execSync("git show HEAD:assets/catalog.json", { cwd: ROOT, encoding: "utf8" });
-    return JSON.parse(raw) as Catalog;
+    const raw = execSync(`git show ${BASE_REF}:${relPath}`, { cwd: ROOT, encoding: "utf8" })
+    return JSON.parse(raw) as T
   } catch {
-    return null; // first sync — no committed catalog yet
+    return null // first sync, or file didn't exist at the baseline
   }
 }
 
-const current = JSON.parse(await readFile(CATALOG, "utf8")) as Catalog;
-const previous = committedCatalog();
-
-const prevBySlug = new Map((previous?.entries ?? []).map((e) => [e.slug, e]));
-const currBySlug = new Map(current.entries.map((e) => [e.slug, e]));
-
-const added = [...currBySlug.keys()].filter((s) => !prevBySlug.has(s)).sort();
-const removed = [...prevBySlug.keys()].filter((s) => !currBySlug.has(s)).sort();
-const reDelivered = [...currBySlug.entries()]
-  .filter(([s, e]) => prevBySlug.get(s) && prevBySlug.get(s)!.delivery !== e.delivery)
-  .map(([s, e]) => `${s} (${prevBySlug.get(s)!.delivery} → ${e.delivery})`)
-  .sort();
-
-// Metadata-only changes (same delivery, different tags/caption/etc.) still warrant
-// a release so consumers get the update.
-const updated = [...currBySlug.entries()]
-  .filter(([s, e]) => {
-    const prev = prevBySlug.get(s);
-    return prev && prev.delivery === e.delivery && JSON.stringify(prev) !== JSON.stringify(e);
-  })
-  .map(([s]) => s)
-  .sort();
-
-if (
-  added.length === 0 &&
-  removed.length === 0 &&
-  reDelivered.length === 0 &&
-  updated.length === 0
-) {
-  console.log("No catalog changes — skipping changeset.");
-  process.exit(0);
+// Human-readable display name for a catalog entry, e.g. "Doctor Hog", "Array Mini" —
+// reads far better in the changelog than the raw Figma slug ("doctor-hog", "dadd-ai-l").
+// Apply renames so the changelog reflects the published name ("Dadd AI Left"), not the
+// raw Figma label the catalog mirror keeps; minis keep their tier suffix.
+const label = (e: { namespace: Namespace; slug: string; name: string; tier?: string }) => {
+  const renamed = applyRename(e.namespace, e.slug, e.name).name
+  return e.tier === "mini" && !renamed.endsWith(" Mini") ? `${renamed} Mini` : renamed
 }
 
-const body: string[] = ["Sync hedgehog catalog from the art pipeline.", ""];
-if (added.length) body.push(`- Added ${added.length}: ${added.join(", ")}`);
-if (removed.length) body.push(`- Removed ${removed.length}: ${removed.join(", ")}`);
-if (reDelivered.length) body.push(`- Re-delivered: ${reDelivered.join(", ")}`);
-if (updated.length) body.push(`- Updated metadata ${updated.length}: ${updated.join(", ")}`);
+const sections: string[] = []
+let totalAdded = 0
+let totalRemoved = 0
 
-const slug = process.env.GITHUB_RUN_ID ?? `${current.entries.length}`;
-const file = join(ROOT, ".changeset", `art-sync-${slug}.md`);
-await writeFile(file, `---\n"@posthog/hedgehogs": minor\n---\n\n${body.join("\n")}\n`);
-console.log(`Wrote ${file}:\n${body.join("\n")}`);
+for (const ns of NAMESPACES) {
+  const rel = `assets/${ns}/catalog.json`
+  const path = join(ROOT, rel)
+  if (!existsSync(path)) continue
+  const current = JSON.parse(await readFile(path, "utf8")) as Catalog
+  const previous = committed<Catalog>(rel)
+
+  // Key by slug+tier: crest full and mini variants share a slug but are distinct assets.
+  const key = (e: { slug: string; tier?: string }) => (e.tier ? `${e.tier}/${e.slug}` : e.slug)
+  const prev = new Map((previous?.entries ?? []).map((e) => [key(e), e]))
+  const curr = new Map(current.entries.map((e) => [key(e), e]))
+
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
+  const added = [...curr.keys()]
+    .filter((s) => !prev.has(s))
+    .map((s) => curr.get(s)!)
+    .sort(byName)
+  const removed = [...prev.keys()]
+    .filter((s) => !curr.has(s))
+    .map((s) => prev.get(s)!)
+    .sort(byName)
+  const updated = [...curr.entries()]
+    .filter(([s, e]) => prev.get(s) && JSON.stringify(prev.get(s)) !== JSON.stringify(e))
+    .map(([, e]) => e)
+    .sort(byName)
+
+  if (added.length || removed.length || updated.length) {
+    totalAdded += added.length
+    totalRemoved += removed.length
+
+    const lines = [`**${ns}**`]
+    if (added.length) lines.push(`- Added ${added.length}: ${added.map(label).join(", ")}`)
+    if (removed.length) lines.push(`- Removed ${removed.length}: ${removed.map(label).join(", ")}`)
+    if (updated.length) lines.push(`- Updated ${updated.length}: ${updated.map(label).join(", ")}`)
+
+    sections.push(lines.join("\n"))
+  }
+}
+
+if (sections.length === 0) {
+  console.log("No catalog changes — skipping changeset.")
+  process.exit(0)
+}
+
+// Accurate one-line summary (becomes the changelog headline), then the per-namespace detail.
+const counts = [
+  totalAdded ? `${totalAdded} added` : "",
+  totalRemoved ? `${totalRemoved} removed` : "",
+].filter(Boolean) as string[]
+
+const headline = counts.length
+  ? `Sync brand assets from Figma (${counts.join(", ")}).`
+  : "Sync brand assets from Figma."
+const body = [headline, ...sections].join("\n\n")
+
+const slug = process.env.GITHUB_RUN_ID ?? "local"
+const file = join(ROOT, ".changeset", `brand-sync-${slug}.md`)
+
+// Always a minor bump: a sync only ever adds, re-renders, or drops illustration assets
+// behind the fully-namespaced API — never a breaking change to existing exports.
+await writeFile(file, `---\n"@posthog/brand": minor\n---\n\n${body}\n`)
+console.log(`Wrote ${file}:\n${body}`)
