@@ -137,6 +137,8 @@
     "lint": "oxlint . && oxfmt --check .",
     "format": "oxfmt --write .",
     "size": "node scripts/size-report.ts",
+    "dev:site": "pnpm build && pnpm --filter @posthog/brand-site dev",
+    "build:site": "pnpm build && pnpm --filter @posthog/brand-site build",
     "changeset": "changeset",
     "release": "changeset publish"
   },

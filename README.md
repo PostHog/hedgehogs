@@ -132,10 +132,7 @@ import doctorHogSvg from "@posthog/brand/hoggies/svg/doctor-hog"
 import arrayCrestPng from "@posthog/brand/crests/full/png/array"
 
 // Or the named barrel export, if you'd rather pull several from one import:
-import {
-  hedgehogDoctorHogSvg,
-  hedgehogCakeHogSvg,
-} from "@posthog/brand/hoggies/svg"
+import { hedgehogDoctorHogSvg, hedgehogCakeHogSvg } from "@posthog/brand/hoggies/svg"
 
 // Lazy-load by slug without bundling the whole namespace:
 const svg = (await import("@posthog/brand/hoggies/svg/" + slug)).default
@@ -175,12 +172,7 @@ The root export is React-free and carries the full cross-namespace manifest plus
 building a picker or looking an asset up by slug:
 
 ```ts
-import {
-  allAssets,
-  findAssets,
-  getAsset,
-  getComponentName,
-} from "@posthog/brand"
+import { allAssets, findAssets, getAsset, getComponentName } from "@posthog/brand"
 
 findAssets({ namespace: "crests", tier: "mini", text: "array" })
 findAssets({ namespace: "hoggies", text: "doctor" })
@@ -221,6 +213,20 @@ losing browser compatibility:
   losslessly recompressed with [oxipng](https://github.com/oxipng/oxipng)
   (`scripts/lib/png.ts`). The output is still a standard PNG — it renders in any browser —
   just ~70% smaller. The pass never grows a file, so it's safe to re-run.
+
+## Demo site
+
+A live showcase of everything in this package lives in [`site/`](./site) — a Vite + React app
+that imports `@posthog/brand` as a workspace dependency, so it renders the **real built
+components**, not copies. It has pages for the logo, colors, hoggies, and crests, and is meant to
+grow into the home for [PostHog's brand assets](https://posthog.com/handbook/company/brand-assets).
+
+```bash
+pnpm dev:site     # builds the package, then starts the site dev server
+pnpm build:site   # builds the package, then the static site into site/dist
+```
+
+It deploys to Cloudflare Pages via the dashboard's Git integration
 
 ## Contributing
 

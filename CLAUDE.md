@@ -89,3 +89,17 @@ a changeset to `main`; that triggers `release.yml`, which (gated by the `Release
 environment + Slack approval, per the PostHog SDK handbook) runs `changeset version`, commits
 the bump to `main`, and publishes to npm via trusted publishing (OIDC). Publishing
 `@posthog/brand` requires the npm trusted-publishing config to be set up for that package name.
+
+## Demo site
+
+`site/` is a Vite + React SPA that showcases the whole package (overview, logo, colors, hoggies,
+crests). The repo is a pnpm workspace (`pnpm-workspace.yaml`); `site/` is a separate private
+package (`@posthog/brand-site`) that depends on `@posthog/brand` via `workspace:*` and imports it
+through the real `exports` map (→ `dist/`), so it doubles as an integration test of the published
+surface. Because of that, the lib must be built first: `pnpm dev:site` / `pnpm build:site`
+(root scripts) run `pnpm build` then the site. The asset grids render **live components** resolved
+by slug (`getComponentName` + a namespace import of the barrel — `site/src/assets-hoggies.ts`,
+`assets-crests.ts`), and the heavy catalog routes are `React.lazy` code-split so the initial bundle
+stays small. The site is themed from the package's own `colorsCss` tokens. It is NOT published to
+npm; it deploys to Cloudflare Pages via the dashboard's Git integration (root dir = repo root,
+build = `pnpm build:site`, output = `site/dist`, `NODE_VERSION=20`).
