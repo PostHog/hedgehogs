@@ -165,10 +165,7 @@ import doctorHogSvg from "@posthog/brand/hoggies/svg/doctor-hog"
 import arrayCrestPng from "@posthog/brand/crests/full/png/array"
 
 // Or the named barrel export, if you'd rather pull several from one import:
-import {
-  hedgehogDoctorHogSvg,
-  hedgehogCakeHogSvg,
-} from "@posthog/brand/hoggies/svg"
+import { hedgehogDoctorHogSvg, hedgehogCakeHogSvg } from "@posthog/brand/hoggies/svg"
 
 // Lazy-load by slug without bundling the whole namespace:
 const svg = (await import("@posthog/brand/hoggies/svg/" + slug)).default
@@ -191,12 +188,7 @@ The root `@posthog/brand` export is **React-free and image-free** — just types
 cross-namespace manifest, and helpers for building a picker or looking an asset up by slug:
 
 ```ts
-import {
-  allAssets,
-  findAssets,
-  getAsset,
-  getComponentName,
-} from "@posthog/brand"
+import { allAssets, findAssets, getAsset, getComponentName } from "@posthog/brand"
 
 findAssets({ namespace: "crests", tier: "mini", text: "array" })
 findAssets({ namespace: "hoggies", text: "doctor" })
