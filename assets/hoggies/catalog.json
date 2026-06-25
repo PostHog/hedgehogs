@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-06-23T17:56:49Z",
+  "generatedAt": "2026-06-25T00:23:59Z",
   "figmaFileKey": "EqKxlSFoOCkRXCnHi4C3eE",
-  "figmaVersion": "2368341320330201069",
+  "figmaVersion": "2368788211683854552",
   "namespace": "hoggies",
   "entries": [
     {
@@ -293,6 +293,15 @@
       "pngBytes": 41122
     },
     {
+      "slug": "doc-brown",
+      "name": "Doc Brown",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7400",
+      "aspectRatio": 1,
+      "svgBytes": 163763,
+      "pngBytes": 49942
+    },
+    {
       "slug": "doctor-2",
       "name": "Doctor 2",
       "namespace": "hoggies",
@@ -536,6 +545,15 @@
       "pngBytes": 51314
     },
     {
+      "slug": "jack-dawson",
+      "name": "Jack Dawson",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7403",
+      "aspectRatio": 1,
+      "svgBytes": 174559,
+      "pngBytes": 50463
+    },
+    {
       "slug": "judge",
       "name": "Judge",
       "namespace": "hoggies",
@@ -570,6 +588,24 @@
       "aspectRatio": 1,
       "svgBytes": 158906,
       "pngBytes": 48008
+    },
+    {
+      "slug": "lemonade",
+      "name": "Lemonade",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7399",
+      "aspectRatio": 1,
+      "svgBytes": 346367,
+      "pngBytes": 47076
+    },
+    {
+      "slug": "lifeguard",
+      "name": "Lifeguard",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7404",
+      "aspectRatio": 1,
+      "svgBytes": 188594,
+      "pngBytes": 45386
     },
     {
       "slug": "magnifying-glass",
@@ -824,6 +860,15 @@
       "pngBytes": 56251
     },
     {
+      "slug": "scott-pilgrim",
+      "name": "Scott Pilgrim",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7401",
+      "aspectRatio": 1,
+      "svgBytes": 326749,
+      "pngBytes": 49438
+    },
+    {
       "slug": "shocked",
       "name": "Shocked",
       "namespace": "hoggies",
@@ -914,6 +959,15 @@
       "pngBytes": 40667
     },
     {
+      "slug": "survey",
+      "name": "Survey",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7398",
+      "aspectRatio": 1,
+      "svgBytes": 149474,
+      "pngBytes": 44595
+    },
+    {
       "slug": "terminator",
       "name": "Terminator",
       "namespace": "hoggies",
@@ -921,6 +975,15 @@
       "aspectRatio": 1,
       "svgBytes": 191120,
       "pngBytes": 21786
+    },
+    {
+      "slug": "the-bride",
+      "name": "The Bride",
+      "namespace": "hoggies",
+      "figmaNodeId": "209:7402",
+      "aspectRatio": 1,
+      "svgBytes": 211661,
+      "pngBytes": 43775
     },
     {
       "slug": "town-crier",
